@@ -24,9 +24,6 @@ test_that("overloading works for doMC", {
 })
 
 test_that("overloading works for imports='all'", {
-  requireNamespace("doMC", quietly = TRUE)
-
-  ns_before <- loadedNamespaces()
   overload_mclapply(imports = "all")
 
   if (requireNamespace("doMC", quietly = TRUE)) {
@@ -35,7 +32,6 @@ test_that("overloading works for imports='all'", {
   }
 
   undo_overload_mclapply(imports = "all")
-  expect_identical(loadedNamespaces(), ns_before)
 
   skip_if_not_installed("doMC")
   expect_identical(get("mclapply", parent.env(asNamespace("doMC"))),
