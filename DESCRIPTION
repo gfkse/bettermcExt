@@ -1,0 +1,32 @@
+Package: bettermcExt
+Title: Extensions of the 'bettermc' Package
+Version: 1.0.0
+Date: 2021-08-13
+Authors@R: 
+    c(person(given = "Andreas",
+            family = "Kersting",
+            role = c("aut", "cre", "cph"),
+            email = "andreas.kersting@gfk.com"),
+      person(given = "GfK SE",
+             role = "cph"))
+Description: Non-CRAN-compatible extensions of the 'bettermc' package for 
+    enhanced fork-based parallelization. Allows overloading of 
+    'parallel::mclapply()' with 'bettermc::mclapply()', making it possible to
+    use the latter as a backend for e.g. 'doMC', 'rstan::sampling()' or 
+    'glmnet::cv.glmnet()'.
+License: MIT + file LICENSE
+URL: https://github.com/gfkse/bettermcExt
+BugReports: https://github.com/gfkse/bettermcExt/issues
+Encoding: UTF-8
+Depends: R (>= 3.5.0)
+Imports:
+    bettermc,
+    checkmate,
+    parallel
+RoxygenNote: 7.2
+Suggests:
+    doMC,
+    foreach,
+    spelling,
+    testthat (>= 2.1.0)
+Language: en-US

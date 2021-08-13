@@ -1,0 +1,116 @@
+---
+output:
+  md_document:
+    variant: gfm
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(cache = TRUE)
+
+# knitr hook function to allow an output.lines option
+# e.g., 
+#   output.lines=12 prints lines 1:12 ...
+#   output.lines=1:12 does the same
+#   output.lines=3:15 prints lines ... 3:15 ...
+#   output.lines=-(1:8) removes lines 1:8 and prints ... 9:n ...
+#   No allowance for anything but a consecutive range of lines
+#   
+# adopted from https://stackoverflow.com/a/23205752
+
+create_output_hook <- function(type) {
+  hook_output <- knitr::knit_hooks$get(type)
+  function(x, options) {
+    lines <- options$output.lines
+    if (is.null(lines)) {
+      return(hook_output(x, options))  # pass to default hook
+    }
+    x <- unlist(strsplit(x, "\n"))
+    more <- "..."
+    if (length(lines) == 1) {  # first n lines
+      if (length(x) > lines) {
+        # truncate the output, but add ...
+        x <- c(head(x, lines), more)
+      }
+    } else {
+      x <- c(if (abs(lines[1]) > 1) more else NULL, 
+             x[lines], 
+             if (length(x) > lines[abs(length(lines))]) more else NULL
+      )
+    }
+    # paste these lines together
+    x <- paste(c(x, ""), collapse = "\n")
+    hook_output(x, options)
+  }
+}
+
+knitr::knit_hooks$set(output = create_output_hook("output"))
+knitr::knit_hooks$set(error = create_output_hook("error"))
+knitr::knit_hooks$set(warning = create_output_hook("warning"))
+knitr::knit_hooks$set(message = create_output_hook("message"))
+```
+
+# bettermcExt
+
+[![R build status](https://github.com/gfkse/bettermcExt/workflows/R-CMD-check/badge.svg)](https://github.com/gfkse/bettermcExt/actions?workflow=R-CMD-check)
+[![codecov](https://codecov.io/gh/gfkse/bettermcExt/branch/master/graph/badge.svg)](https://codecov.io/gh/gfkse/bettermcExt)
+
+The `bettermcExt` package provides extensions of the [bettermc](https://cran.r-project.org/package=bettermc) package which are not allowed on CRAN.
+
+## Installation of the Latest Release
+```{r, eval = FALSE}
+# install.packages("remotes")
+remotes::install_github("gfkse/bettermcExt", remotes::github_release())
+```
+
+## Overloading `parallel::mclapply()` With `bettermc::mclapply()`
+Enable the use of `bettermc::mclapply()` by third-party packages originally using `mclapply()` from the `parallel` package, e.g. `doMC` or `rstan`. This is achieved by replacing the `mclapply`-function in various environments, which violates the following [CRAN policy](https://cran.r-project.org/web/packages/policies.html):
+
+> A package must not tamper with the code already loaded into R: any attempt to change code in the standard and recommended packages which ship with R is prohibited. 
+> Altering the namespace of another package should only be done with the agreement of the maintainer of that package.
+
+### Example: Making `doMC` Reproducible
+```{r domc, error=TRUE}
+doMC::registerDoMC(2L)
+
+# fix mc.set.seed arg to NA in order to avoid modifications by doMC:::doMC
+bettermcExt::overload_mclapply(imports = "doMC", fixed_args = list(mc.set.seed = NA))
+
+set.seed(123)
+ret1 <- foreach::`%dopar%`(foreach::foreach(i = 1:4), runif(1))
+set.seed(123)
+ret2 <- foreach::`%dopar%`(foreach::foreach(i = 1:4), runif(1))
+stopifnot(identical(ret1, ret2))
+
+bettermcExt::undo_overload_mclapply(imports = "doMC")
+
+# back to using parallel::mclapply under the hood -> seeding has no effect
+set.seed(123)
+ret3 <- foreach::`%dopar%`(foreach::foreach(i = 1:4), runif(1))
+set.seed(123)
+ret4 <- foreach::`%dopar%`(foreach::foreach(i = 1:4), runif(1))
+stopifnot(identical(ret3, ret4))
+```
+
+### Example: Making `rstan::sampling()` Reproducible
+Note that `rstan::sampling()` uses `mclapply()` only in a non-interactive session.
+```{r rstan, warning=FALSE, error=TRUE}
+bettermcExt::overload_mclapply(parallel_namespace = TRUE)
+
+m <- rstan::stan_model(model_code = 'parameters {real y;} model {y ~ normal(0,1);}')
+
+set.seed(456)
+capture.output(f1 <- rstan::sampling(m, iter = 100, cores = 2), file = "/dev/null")
+set.seed(456)
+capture.output(f2 <- rstan::sampling(m, iter = 100, cores = 2), file = "/dev/null")
+stopifnot(identical(rstan::extract(f1), rstan::extract(f2)))
+
+bettermcExt::undo_overload_mclapply(parallel_namespace = TRUE)
+
+# back to using parallel::mclapply under the hood -> seeding has no effect
+set.seed(456)
+capture.output(f3 <- rstan::sampling(m, iter = 100, cores = 2), file = "/dev/null")
+set.seed(456)
+capture.output(f4 <- rstan::sampling(m, iter = 100, cores = 2), file = "/dev/null")
+stopifnot(identical(rstan::extract(f3), rstan::extract(f4)))
+```
+
